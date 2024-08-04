@@ -4,8 +4,7 @@ import Peer from 'simple-peer';
 
 const SocketContext = createContext();
 
-// const socket = io('http://localhost:5000');
-const socket = io('https://chat-app-server-v8ze.onrender.com/')
+const socket = io('http://localhost:5000');
 
 const ContextProvider = ({ children }) => {
   const [callAccepted, setCallAccepted] = useState(false);
@@ -14,6 +13,7 @@ const ContextProvider = ({ children }) => {
   const [name, setName] = useState('');
   const [call, setCall] = useState({});
   const [me, setMe] = useState('');
+  const [users, setUsers] = useState([]);
 
   const myVideo = useRef();
   const userVideo = useRef();
@@ -23,11 +23,14 @@ const ContextProvider = ({ children }) => {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
         setStream(currentStream);
-
         myVideo.current.srcObject = currentStream;
       });
 
     socket.on('me', (id) => setMe(id));
+
+    socket.on('updateUserList', (userList) => {
+      setUsers(userList);
+    });
 
     socket.on('callUser', ({ from, name: callerName, signal }) => {
       setCall({ isReceivingCall: true, from, name: callerName, signal });
@@ -65,7 +68,6 @@ const ContextProvider = ({ children }) => {
 
     socket.on('callAccepted', (signal) => {
       setCallAccepted(true);
-
       peer.signal(signal);
     });
 
@@ -74,9 +76,8 @@ const ContextProvider = ({ children }) => {
 
   const leaveCall = () => {
     setCallEnded(true);
-
     connectionRef.current.destroy();
-
+    socket.emit('callEnded');
     window.location.reload();
   };
 
@@ -94,6 +95,7 @@ const ContextProvider = ({ children }) => {
       callUser,
       leaveCall,
       answerCall,
+      users,
     }}
     >
       {children}
