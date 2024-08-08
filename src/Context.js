@@ -4,8 +4,7 @@ import Peer from 'simple-peer';
 
 const SocketContext = createContext();
 
-// const socket = io('http://localhost:5000');
-const socket = io('https://chat-app-server-v8ze.onrender.com/');
+const socket = io('http://localhost:5000');
 
 const ContextProvider = ({ children }) => {
   const [callAccepted, setCallAccepted] = useState(false);
@@ -15,6 +14,8 @@ const ContextProvider = ({ children }) => {
   const [call, setCall] = useState({});
   const [me, setMe] = useState('');
   const [users, setUsers] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [currentChat, setCurrentChat] = useState('');
 
   const myVideo = useRef();
   const userVideo = useRef();
@@ -36,7 +37,16 @@ const ContextProvider = ({ children }) => {
     socket.on('callUser', ({ from, name: callerName, signal }) => {
       setCall({ isReceivingCall: true, from, name: callerName, signal });
     });
+
+    socket.on('receiveMessage', ({ message, from }) => {
+      setMessages((prevMessages) => [...prevMessages, { message, from }]);
+    });
+
   }, []);
+
+  const join = () => {
+    socket.emit('join', { name });
+  };
 
   const answerCall = () => {
     setCallAccepted(true);
@@ -54,6 +64,7 @@ const ContextProvider = ({ children }) => {
     peer.signal(call.signal);
 
     connectionRef.current = peer;
+    setCurrentChat(call.from); // Set the current chat to the caller's ID
   };
 
   const callUser = (id) => {
@@ -73,6 +84,7 @@ const ContextProvider = ({ children }) => {
     });
 
     connectionRef.current = peer;
+    setCurrentChat(id); // Set the current chat to the callee's ID
   };
 
   const leaveCall = () => {
@@ -80,6 +92,11 @@ const ContextProvider = ({ children }) => {
     connectionRef.current.destroy();
     socket.emit('callEnded');
     window.location.reload();
+  };
+
+  const sendMessage = (message) => {
+    socket.emit('sendMessage', { to: currentChat, message, from: me });
+    setMessages((prevMessages) => [...prevMessages, { message, from: me }]);
   };
 
   return (
@@ -97,6 +114,10 @@ const ContextProvider = ({ children }) => {
       leaveCall,
       answerCall,
       users,
+      join,
+      messages,
+      sendMessage,
+      setCurrentChat,
     }}
     >
       {children}

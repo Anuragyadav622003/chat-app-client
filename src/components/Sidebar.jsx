@@ -1,9 +1,7 @@
-import React, { useContext } from 'react';
-import { Button, Grid, Typography, Container, Paper, List, ListItem, ListItemText, TextField } from '@material-ui/core';
-import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Assignment, Phone, PhoneDisabled } from '@material-ui/icons';
+import React, { useContext, useEffect, useState, useRef } from 'react';
+import { Button, Grid, Typography, Container, Paper, List, ListItem, ListItemText, TextField, Tabs, Tab, Box } from '@material-ui/core';
+import { Assignment, Phone } from '@material-ui/icons';
 import { makeStyles } from '@material-ui/core/styles';
-
 import { SocketContext } from '../Context';
 
 const useStyles = makeStyles((theme) => ({
@@ -11,81 +9,165 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
   },
-  gridContainer: {
-    width: '100%',
-    [theme.breakpoints.down('xs')]: {
-      flexDirection: 'column',
-    },
-  },
   container: {
-    width: '600px',
-    margin: '35px 0',
-    padding: 0,
-    [theme.breakpoints.down('xs')]: {
-      width: '80%',
-    },
-  },
-  margin: {
-    marginTop: 20,
-  },
-  padding: {
-    padding: 20,
+    width: '390px',
+    margin: 'auto',
   },
   paper: {
     padding: '10px 20px',
-    border: '2px solid black',
+    border: '2px solid #ccc',
+    borderRadius: '8px',
+  },
+  tabs: {
+    color: theme.palette.common.white,
+    borderBottom: '1px solid #ccc',
+    backgroundColor: '#7B61FF',
+    fontSize: '0rem',
+  },
+  tabPanel: {
+    // padding: '20px 0',
+  },
+  chatContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '240px',
+    borderRadius: '8px',
+    overflowY: 'scroll',
+    padding: '10px',
+  },
+  chatInput: {
+    marginTop: '20px',
+    display: 'flex',
+  },
+  chatTextField: {
+    flex: 1,
+    marginRight: '10px',
+  },
+  message: {
+    color: 'white',
+    padding: '7px',
+    margin: '5px',
+    borderBottom: '1px solid #eee',
+  },
+  ownMessage: {
+    backgroundColor: '#7B61FF',
+    alignSelf: 'flex-end',
+    borderRadius: '8px',
+  },
+  otherMessage: {
+    backgroundColor: '#9F7AEA',
+    borderRadius: '8px',
+    alignSelf: 'flex-start',
+  },
+  margin: {
+    margin: '10px 0',
+    backgroundColor: '#7B61FF',
+    color: theme.palette.common.white,
+    '&:hover': {
+      backgroundColor: '#9F7AEA',
+    },
   },
 }));
 
 const Sidebar = ({ children }) => {
-  const { me, name, setName, callUser, leaveCall, callAccepted, users, } = useContext(SocketContext);
+  const [entered, setEntered] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0);
+  const [message, setMessage] = useState('');
+  const { me, name, setName, callUser, users, join, messages, sendMessage, setCurrentChat } = useContext(SocketContext);
   const classes = useStyles();
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    if (name) join();
+  }, [name]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    sendMessage(message);
+    setMessage('');
+  };
 
   return (
     <Container className={classes.container}>
       <Paper elevation={10} className={classes.paper}>
-        <form className={classes.root} noValidate autoComplete="off">
-          <Grid container className={classes.gridContainer}>
-            <Grid item xs={12} md={6} className={classes.padding}>
-              <Typography gutterBottom variant="h6">Account Info</Typography>
-              <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-              <CopyToClipboard text={me} className={classes.margin}>
-                <Button variant="contained" color="primary" fullWidth startIcon={<Assignment fontSize="large" />}>
-                  Copy Your ID
-                </Button>
-              </CopyToClipboard>
-            </Grid>
-            <Grid item xs={12} md={6} className={classes.padding}>
+        {!entered && (
+          <div>
+            <Typography gutterBottom variant="h6">Account Info</Typography>
+            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+            <Button className={classes.margin} variant="contained" fullWidth startIcon={<Assignment fontSize="large" />} onClick={() => setEntered(true)}>
+              Enter Meeting Room
+            </Button>
+          </div>
+        )}
+        {entered && (
+          <>
+            <Tabs value={tabIndex} onChange={(e, newIndex) => setTabIndex(newIndex)} className={classes.tabs} indicatorColor="secondary" centered>
+              <Tab label="Active Users" />
+              <Tab label="Chats" />
+            </Tabs>
+            <TabPanel value={tabIndex} index={0} className={classes.tabPanel}>
               <Typography gutterBottom variant="h6">Users in Meeting</Typography>
               <List>
                 {users.map((user) => (
                   user.id !== me && (
-                    <ListItem key={user.id} button onClick={() => callUser(user.id)}>
-                      <ListItemText primary={user.id} />
+                    <ListItem key={user.id} button onClick={() => { callUser(user.id); setCurrentChat(user.id); }}>
+                      <ListItemText primary={user.name} />
                       <Phone fontSize="large" />
                     </ListItem>
                   )
                 ))}
               </List>
-            </Grid>
-          </Grid>
-        </form>
-        {callAccepted && (
-          <Button
-            variant="contained"
-            color="secondary"
-            fullWidth
-            startIcon={<PhoneDisabled fontSize="large" />}
-            onClick={leaveCall}
-            className={classes.margin}
-          >
-            Hang Up
-          </Button>
+            </TabPanel>
+            <TabPanel value={tabIndex} index={1} className={classes.tabPanel}>
+              <div className={classes.chatContainer}>
+                {messages.map((msg, index) => (
+                  <div key={index} className={`${classes.message} ${msg.from === me ? classes.ownMessage : classes.otherMessage}`}>
+                    <Typography variant="body2">{msg.message}</Typography>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <form className={classes.chatInput} onSubmit={handleSendMessage}>
+                <TextField
+                  label="Type a message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className={classes.chatTextField}
+                  fullWidth
+                />
+                <Button type="submit" variant="contained" color="secondary">
+                  Send
+                </Button>
+              </form>
+            </TabPanel>
+          </>
         )}
-        {children}
       </Paper>
+      {children}
     </Container>
   );
 };
+
+const TabPanel = (props) => {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      {...other}
+    >
+      {value === index && (
+        <Box p={3}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 
 export default Sidebar;
